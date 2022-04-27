@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 set -eu -o pipefail
 exe=${1:?First argument is the executable under test}
@@ -17,4 +17,3 @@ snapshot="$root/snapshots"
 
 # shellcheck source=./tests/included-stateless-substitute.sh
 source "$root/included-stateless-substitute.sh"
-
