@@ -13,11 +13,11 @@ path = "{bin_path}"
 
 [dependencies]
 yup-oauth2 = "^3.1"
-google_api_auth = { git = "https://github.com/google-apis-rs/generator", features = ["with-yup-oauth2"] }
+google_api_auth = { git = "https://github.com/B4dM4n/google-apis-rs-generator", features = ["with-yup-oauth2"] }
 clap = "^2.33"
 serde_json = "1.0.40"
 dirs = "2.0"
-google_cli_shared = { git = "https://github.com/google-apis-rs/generator", version = "0.1.0" }
+google_cli_shared = { git = "https://github.com/B4dM4n/google-apis-rs-generator", version = "0.1.0" }
 default-boxed = "0.1.6"
 "#;
 
