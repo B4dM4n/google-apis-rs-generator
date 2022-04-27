@@ -66,8 +66,7 @@ impl From<&ApiResource> for Resource {
                     .segments
                     .last()
                     .expect("at least one item")
-                    .ident
-                    .to_string(),
+                    .ident,
                 parent_count.saturating_sub(1)
             )
         };

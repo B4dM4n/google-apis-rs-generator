@@ -28,16 +28,16 @@ pub fn generate(
     match mode {
         ApiAndCliInParallelNoErrorHandling => {
             let _ignore_errors_while_cli_gen_may_fail = crossbeam::scope(|s| {
-                s.spawn(|_| generate_library(lib_dir, &discovery_desc).map_err(|e| e.to_string()));
-                s.spawn(|_| cli::generate(cli_dir, &discovery_desc).map_err(|e| e.to_string()));
+                s.spawn(|_| generate_library(lib_dir, discovery_desc).map_err(|e| e.to_string()));
+                s.spawn(|_| cli::generate(cli_dir, discovery_desc).map_err(|e| e.to_string()));
             });
         }
         ApiAndCli => {
-            generate_library(lib_dir, &discovery_desc)?;
-            cli::generate(cli_dir, &discovery_desc)?;
+            generate_library(lib_dir, discovery_desc)?;
+            cli::generate(cli_dir, discovery_desc)?;
         }
-        OnlyCli => cli::generate(cli_dir, &discovery_desc)?,
-        OnlyApi => generate_library(lib_dir, &discovery_desc)?,
+        OnlyCli => cli::generate(cli_dir, discovery_desc)?,
+        OnlyApi => generate_library(lib_dir, discovery_desc)?,
     }
 
     Ok(())

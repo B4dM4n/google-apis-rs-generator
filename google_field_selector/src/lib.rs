@@ -13,26 +13,27 @@ pub fn to_string<T: FieldSelector>() -> String {
         let mut iter = fields.iter();
         let mut next = iter.next();
         while let Some(field) = next {
-            append_field(parents, &field, output);
+            append_field(parents, field, output);
             next = iter.next();
             if next.is_some() {
-                output.push_str(",");
+                output.push(',');
             }
         }
     }
 
+    #[allow(clippy::ptr_arg)]
     fn append_field(parents: &mut Vec<&str>, field: &Field, output: &mut String) {
         let append_parents = |output: &mut String| {
             for &parent in parents.iter() {
                 output.push_str(parent);
-                output.push_str("/");
+                output.push('/');
             }
         };
 
         match field {
             Field::Glob => {
                 append_parents(output);
-                output.push_str("*");
+                output.push('*');
             }
             Field::Named {
                 field_name,
@@ -48,9 +49,9 @@ pub fn to_string<T: FieldSelector>() -> String {
                     match &**inner_field_type {
                         FieldType::Leaf | FieldType::Container(_) => {}
                         FieldType::Struct(fields) => {
-                            output.push_str("(");
+                            output.push('(');
                             append_fields(&mut Vec::new(), fields, output);
-                            output.push_str(")");
+                            output.push(')');
                         }
                     }
                 }

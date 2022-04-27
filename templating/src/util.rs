@@ -1,6 +1,4 @@
 use failure::{bail, Error, Fail, ResultExt};
-use json;
-use yaml;
 
 use std::{io::Cursor, io::Read};
 

@@ -1,8 +1,4 @@
-use atty;
 use failure::{bail, err_msg, format_err, Error, ResultExt};
-use json;
-use liquid;
-use yaml_rust;
 
 use std::{
     collections::BTreeSet,

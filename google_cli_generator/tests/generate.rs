@@ -1,8 +1,5 @@
 use discovery_parser::DiscoveryRestDesc;
 use google_cli_generator as lib;
-use serde_json;
-use shared;
-use simple_logger;
 use std::convert::TryFrom;
 use std::{
     error::Error,
@@ -13,7 +10,6 @@ use std::{
     str::FromStr,
 };
 use tempfile::TempDir;
-use toml_edit;
 
 static SPEC: &str = include_str!("spec.json");
 
@@ -59,7 +55,7 @@ fn fixup_cli(
     api: &shared::Api,
     standard: &shared::Standard,
 ) -> Result<(), Box<dyn Error>> {
-    let (cargo_toml_path, mut document) = toml_document(path, &standard)?;
+    let (cargo_toml_path, mut document) = toml_document(path, standard)?;
 
     document["dependencies"][&api.lib_crate_name]["path"] = toml_edit::value(
         Path::new("..")
@@ -73,7 +69,7 @@ fn fixup_cli(
 }
 
 fn fixup_deps(path: &Path, standard: &shared::Standard) -> Result<(), Box<dyn Error>> {
-    let (cargo_toml_path, mut document) = toml_document(path, &standard)?;
+    let (cargo_toml_path, mut document) = toml_document(path, standard)?;
 
     document["workspace"] = toml_edit::table();
     let dependencies = &mut document["dependencies"];

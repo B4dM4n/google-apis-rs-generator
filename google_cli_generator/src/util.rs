@@ -7,7 +7,7 @@ pub fn concat_with_and(items: impl Iterator<Item = impl AsRef<str>>) -> String {
     if items.len() > 1 {
         buf.push_str(" and ");
     }
-    if items.len() > 0 {
+    if !items.is_empty() {
         buf.push_str(items.last().expect("last element"));
     }
     buf

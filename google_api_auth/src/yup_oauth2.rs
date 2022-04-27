@@ -53,7 +53,7 @@ mod tests {
 
         let auth = from_authenticator(auth, vec!["foo", "bar"]);
 
-        fn this_should_work<T: GetAccessToken>(_x: T) {};
+        fn this_should_work<T: GetAccessToken>(_x: T) {}
         this_should_work(auth);
     }
 }

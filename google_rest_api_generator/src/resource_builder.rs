@@ -45,7 +45,7 @@ pub(crate) fn generate(
     let nested_resource_actions = resource
         .resources
         .iter()
-        .map(|sub_resource| crate::resource_actions::generate(sub_resource));
+        .map(crate::resource_actions::generate);
     let action_ident = resource.action_type_name();
     quote! {
         pub mod #ident {

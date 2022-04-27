@@ -132,8 +132,8 @@ fn expression(input: &str) -> IResult<&str, Expression> {
 
 fn template_ast_node(input: &str) -> IResult<&str, AstNode> {
     alt((
-        map(take_while1(|c| c != '{'), |lit| AstNode::Lit(lit)),
-        map(expression, |expr| AstNode::Expr(expr)),
+        map(take_while1(|c| c != '{'), AstNode::Lit),
+        map(expression, AstNode::Expr),
     ))(input)
 }
 

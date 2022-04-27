@@ -175,7 +175,7 @@ impl Api {
     }
 }
 
-pub const CI_WHITELIST: &[&'static str] = &[
+pub const CI_WHITELIST: &[&str] = &[
     "urlshortener:v1",
     "admin:directory_v1",
     "drive:v3",

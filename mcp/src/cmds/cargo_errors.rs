@@ -73,7 +73,7 @@ pub fn execute(
                 }
             };
 
-            if let Some(_) = cargo.try_wait()? {
+            if (cargo.try_wait()?).is_some() {
                 break;
             }
 
@@ -95,7 +95,7 @@ pub fn execute(
             .expect("cargo_output is set")
             .read_to_end(&mut input)?;
 
-        io::stderr().write(&input[print_from..])?;
+        io::stderr().write_all(&input[print_from..])?;
 
         match parse_errors(&input) {
             Ok((_, parsed)) => {

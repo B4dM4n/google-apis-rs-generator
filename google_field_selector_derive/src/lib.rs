@@ -58,7 +58,7 @@ fn expand_derive_field_selector(input: &DeriveInput) -> Result<TokenStream2, Box
     })
 }
 
-fn selector_for_field<'a>(field: &serdei::ast::Field<'a>) -> TokenStream2 {
+fn selector_for_field(field: &serdei::ast::Field<'_>) -> TokenStream2 {
     enum AttrOverride {
         ContainerOf(syn::ExprPath),
         Leaf,

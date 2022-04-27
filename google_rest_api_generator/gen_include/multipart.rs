@@ -37,13 +37,13 @@ mod multipart {
 
     pub(crate) struct Part {
         content_type: ::mime::Mime,
-        body: Box<dyn::std::io::Read + Send>,
+        body: Box<dyn ::std::io::Read + Send>,
     }
 
     impl Part {
         pub(crate) fn new(
             content_type: ::mime::Mime,
-            body: Box<dyn::std::io::Read + Send>,
+            body: Box<dyn ::std::io::Read + Send>,
         ) -> Part {
             Part { content_type, body }
         }
@@ -52,20 +52,21 @@ mod multipart {
     pub(crate) struct RelatedMultiPartReader {
         state: RelatedMultiPartReaderState,
         boundary: String,
-        next_body: Option<Box<dyn::std::io::Read + Send>>,
+        next_body: Option<Box<dyn ::std::io::Read + Send>>,
         parts: std::vec::IntoIter<Part>,
     }
 
     enum RelatedMultiPartReaderState {
         WriteBoundary {
-            start: usize, boundary: String,
+            start: usize,
+            boundary: String,
         },
         WriteContentType {
             start: usize,
             content_type: Vec<u8>,
         },
         WriteBody {
-            body: Box<dyn::std::io::Read + Send>,
+            body: Box<dyn ::std::io::Read + Send>,
         },
     }
 
@@ -90,8 +91,11 @@ mod multipart {
                             self.next_body = Some(next_part.body);
                             self.state = WriteContentType {
                                 start: 0,
-                                content_type: format!("Content-Type: {}\r\n\r\n", next_part.content_type)
-                                    .into_bytes(),
+                                content_type: format!(
+                                    "Content-Type: {}\r\n\r\n",
+                                    next_part.content_type
+                                )
+                                .into_bytes(),
                             };
                         } else {
                             break;
@@ -101,7 +105,8 @@ mod multipart {
                         start,
                         content_type,
                     } => {
-                        let bytes_to_copy = std::cmp::min(content_type.len() - *start, rem_buf.len());
+                        let bytes_to_copy =
+                            std::cmp::min(content_type.len() - *start, rem_buf.len());
                         rem_buf[..bytes_to_copy]
                             .copy_from_slice(&content_type[*start..*start + bytes_to_copy]);
                         *start += bytes_to_copy;

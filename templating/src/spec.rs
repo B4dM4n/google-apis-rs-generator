@@ -1,4 +1,3 @@
-use atty;
 use failure::{bail, Error, ResultExt};
 
 use std::{

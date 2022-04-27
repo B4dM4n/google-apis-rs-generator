@@ -25,7 +25,7 @@ pub(crate) fn generate(method: &Method, global_params: &[Param]) -> TokenStream 
         };
         init_method
     }));
-    let all_params = global_params.into_iter().chain(method.params.iter());
+    let all_params = global_params.iter().chain(method.params.iter());
     method_builder_initializers.extend(all_params.map(|param| {
         let name = &param.ident;
         let field_pattern: syn::FieldValue = if param.required {

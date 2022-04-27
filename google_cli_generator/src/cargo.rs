@@ -27,7 +27,7 @@ pub(crate) fn cargo_toml(api: &shared::Api, standard: &shared::Standard) -> Stri
         .replace("{crate_name}", &api.cli_crate_name)
         .replace(
             "{crate_version}",
-            &api.cli_crate_version
+            api.cli_crate_version
                 .as_ref()
                 .expect("available crate version"),
         )
@@ -35,7 +35,7 @@ pub(crate) fn cargo_toml(api: &shared::Api, standard: &shared::Standard) -> Stri
         .replace("{bin_path}", &standard.main_path);
 
     doc.push_str(&format!("\n[dependencies.{}]\n", api.lib_crate_name));
-    doc.push_str(&format!("path = \"../lib\"\n"));
+    doc.push_str("path = \"../lib\"\n");
     doc.push_str(&format!(
         "version = \"{}\"\n",
         api.lib_crate_version

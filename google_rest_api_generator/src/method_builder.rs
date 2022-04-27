@@ -1,6 +1,6 @@
 use crate::{
-    markdown, to_ident, to_rust_varstr, Method, Param, ParamInitMethod, PropertyDesc,
-    RefOrType, Type, TypeDesc,
+    markdown, to_ident, to_rust_varstr, Method, Param, ParamInitMethod, PropertyDesc, RefOrType,
+    Type, TypeDesc,
 };
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -17,7 +17,7 @@ pub(crate) fn generate(
     schemas: &BTreeMap<syn::Ident, Type>,
 ) -> TokenStream {
     let builder_name = method.builder_name();
-    let all_params = method.params.iter().chain(global_params.into_iter());
+    let all_params = method.params.iter().chain(global_params.iter());
     let (required_params, optional_params): (Vec<_>, _) =
         all_params.clone().partition(|param| param.required);
 
@@ -96,8 +96,12 @@ pub(crate) fn generate(
         });
 
     let base_url = format!("{}{}", root_url, service_path);
-    let default_path_method =
-        path_method(&parse_quote! {_path}, &base_url, &method.path, &method.params);
+    let default_path_method = path_method(
+        &parse_quote! {_path},
+        &base_url,
+        &method.path,
+        &method.params,
+    );
     let request_method = request_method(&method.http_method, all_params);
     let exec_method = exec_method(method.request.as_ref(), method.response.as_ref());
     let (iter_methods, iter_types_and_impls) = iter_defs(method, schemas);
@@ -224,7 +228,7 @@ fn path_method(
     use crate::path_templates::{PathAstNode, PathTemplate};
     use std::borrow::Cow;
     let template_ast = PathTemplate::new(path_template)
-        .expect(&format!("invalid path template: {}", path_template));
+        .unwrap_or_else(|_| panic!("invalid path template: {}", path_template));
     let tokens = template_ast
         .nodes()
         .map(|node| match node {
@@ -242,7 +246,7 @@ fn path_method(
                 let param = params
                     .iter()
                     .find(|p| &p.id == var_name)
-                    .expect(&format!("failed to find var {}", var_name));
+                    .unwrap_or_else(|| panic!("failed to find var {}", var_name));
                 if !param.required {
                     panic!(
                         "path template {} uses param {}, which is not required",
@@ -362,30 +366,32 @@ fn reqwest_http_method(http_method: &::reqwest::Method) -> syn::Path {
 }
 
 fn request_method<'a>(http_method: &str, params: impl Iterator<Item = &'a Param>) -> TokenStream {
-    let query_params = params.filter(|param| param.location == "query").map(|param| {
-        let id = &param.id;
-        let ident = &param.ident;
-        match param.typ.type_desc {
-            TypeDesc::Array{..} if param.required => {
-                quote! {
-                    for value in &self.#ident {
-                        req = req.query(&[(#id, value)]);
+    let query_params = params
+        .filter(|param| param.location == "query")
+        .map(|param| {
+            let id = &param.id;
+            let ident = &param.ident;
+            match param.typ.type_desc {
+                TypeDesc::Array { .. } if param.required => {
+                    quote! {
+                        for value in &self.#ident {
+                            req = req.query(&[(#id, value)]);
+                        }
                     }
                 }
-            },
-            TypeDesc::Array{..} if !param.required => {
-                quote! {
-                    for value in self.#ident.iter().flatten() {
-                        req = req.query(&[(#id, value)]);
+                TypeDesc::Array { .. } if !param.required => {
+                    quote! {
+                        for value in self.#ident.iter().flatten() {
+                            req = req.query(&[(#id, value)]);
+                        }
                     }
                 }
-            },
-            _ => quote! {req = req.query(&[(#id, &self.#ident)]);},
-        }
-    });
+                _ => quote! {req = req.query(&[(#id, &self.#ident)]);},
+            }
+        });
 
     let http_method = ::reqwest::Method::from_str(http_method)
-        .expect(format!("unknown http method: {}", http_method).as_str());
+        .unwrap_or_else(|_| panic!("unknown http method: {}", http_method));
     let reqwest_method = reqwest_http_method(&http_method);
     quote! {
         fn _request(&self, path: &str) -> Result<::reqwest::blocking::RequestBuilder, crate::Error> {
@@ -397,7 +403,7 @@ fn request_method<'a>(http_method: &str, params: impl Iterator<Item = &'a Param>
     }
 }
 
-fn iterable_method_impl<'a>(method: &Method) -> TokenStream {
+fn iterable_method_impl(method: &Method) -> TokenStream {
     let builder_name = method.builder_name();
     quote! {
         impl<'a> crate::iter::IterableMethod for #builder_name<'a> {

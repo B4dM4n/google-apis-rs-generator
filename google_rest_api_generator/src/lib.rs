@@ -4,7 +4,6 @@ use log::{debug, info};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use serde::{Deserialize, Serialize};
-use shared;
 use std::{
     borrow::Cow, collections::BTreeMap, collections::HashMap, convert::TryFrom, error::Error,
     io::Write, path::Path, time::Instant,
@@ -56,11 +55,7 @@ pub fn generate(
     info!("api: prepared APIDesc in {:?}", time.elapsed());
 
     let any_bytes_types = api_desc.fold_types(false, |accum, typ| {
-        accum
-            || match &typ.type_desc {
-                TypeDesc::Bytes => true,
-                _ => false,
-            }
+        accum || matches!(&typ.type_desc, TypeDesc::Bytes)
     });
 
     let any_resumable_upload_methods = api_desc.fold_methods(false, |accum, method| {
@@ -187,7 +182,7 @@ impl APIDesc {
                 oauth2: Oauth2Desc { scopes },
             }) => scopes
                 .iter()
-                .map(|(scope, sc)| ScopeDesc::new(&scope, &sc.description))
+                .map(|(scope, sc)| ScopeDesc::new(scope, &sc.description))
                 .collect(),
             _ => Vec::new(),
         };
@@ -248,10 +243,7 @@ impl APIDesc {
             )
         });
         info!("creating resource actions");
-        let resource_actions = self
-            .resources
-            .iter()
-            .map(|resource| resource_actions::generate(resource));
+        let resource_actions = self.resources.iter().map(resource_actions::generate);
 
         let method_builders = self.methods.iter().map(|method| {
             method_builder::generate(
@@ -417,7 +409,7 @@ impl Resource {
         disco_resource: &discovery_parser::ResourceDesc,
         ident_tracker: &mut TypeIdentTracker,
     ) -> Resource {
-        let resource_ident = to_ident(&to_rust_varstr(&resource_id));
+        let resource_ident = to_ident(&to_rust_varstr(resource_id));
         let mut methods: Vec<Method> = disco_resource
             .methods
             .iter()
@@ -515,7 +507,7 @@ impl Method {
             .iter()
             .map(|(param_id, param_desc)| {
                 Param::from_disco_method_param(
-                    &method_id,
+                    method_id,
                     param_id,
                     &parse_quote! {#parent_path::params},
                     param_desc,
@@ -553,11 +545,7 @@ impl Method {
                 // Many (all?) upload paths start with a '/' which when appended
                 // with rootUrl will result in duplicate '/'s. Remove a starting
                 // '/' in the upload path to address this.
-                let path = if path.starts_with('/') {
-                    &path[1..]
-                } else {
-                    path.as_str()
-                };
+                let path = path.strip_prefix('/').unwrap_or(path);
                 path.to_owned()
             };
             MediaUpload {
@@ -606,17 +594,14 @@ impl Method {
             .as_ref()
             .map(|resp_type| {
                 if let TypeDesc::Object { props, .. } = &resp_type.get_type(schemas).type_desc {
-                    props
-                        .values()
-                        .find(|PropertyDesc { id, typ, .. }| {
-                            if let TypeDesc::String = typ.get_type(schemas).type_desc {
-                                if id == "nextPageToken" {
-                                    return true;
-                                }
+                    props.values().any(|PropertyDesc { id, typ, .. }| {
+                        if let TypeDesc::String = typ.get_type(schemas).type_desc {
+                            if id == "nextPageToken" {
+                                return true;
                             }
-                            false
-                        })
-                        .is_some()
+                        }
+                        false
+                    })
                 } else {
                     false
                 }
@@ -660,7 +645,7 @@ impl Param {
         disco_param: &discovery_parser::ParamDesc,
         ident_tracker: &mut TypeIdentTracker,
     ) -> Param {
-        let ident = to_ident(&to_rust_varstr(&param_id));
+        let ident = to_ident(&to_rust_varstr(param_id));
         Param::with_ident(
             param_id,
             ident,
@@ -781,7 +766,7 @@ fn fixup(s: String) -> String {
         .chars()
         .map(|c| if !c.is_ascii_alphanumeric() { '_' } else { c })
         .collect();
-    match s.chars().nth(0) {
+    match s.chars().next() {
         Some(c) if c.is_ascii_digit() => "_".to_owned() + &s,
         _ => s,
     }
@@ -794,7 +779,7 @@ fn to_ident(s: &str) -> syn::Ident {
 fn make_field(doc: &Option<String>, ident: &syn::Ident, ty: syn::Type) -> syn::Field {
     let mut attrs = Vec::new();
     if let Some(doc) = doc {
-        let doc = syn::LitStr::new(&markdown::sanitize(&doc), Span::call_site());
+        let doc = syn::LitStr::new(&markdown::sanitize(doc), Span::call_site());
         use syn::parse::Parser;
         attrs = syn::Attribute::parse_outer
             .parse2(quote! {
@@ -903,13 +888,13 @@ impl TypeIdentTracker {
 
     fn reserve(&mut self, id: &str, parent_path: &syn::Path) {
         use std::collections::hash_map::Entry;
-        let wanted = to_ident(&to_rust_typestr(&id));
+        let wanted = to_ident(&to_rust_typestr(id));
         let path: syn::Path = parse_quote! {#parent_path::#wanted};
         match self.0.entry(path) {
             Entry::Vacant(entry) => {
                 entry.insert(IdentTrackerEntry::Reserved);
             }
-            Entry::Occupied(_) => panic!(format!("unable to reserve '{}' already exists", &wanted)),
+            Entry::Occupied(_) => panic!("unable to reserve '{}' already exists", &wanted),
         }
     }
 
@@ -920,7 +905,7 @@ impl TypeIdentTracker {
                 desired,
                 parent_path,
             } => {
-                let mut wanted = to_ident(&to_rust_typestr(&desired));
+                let mut wanted = to_ident(&to_rust_typestr(desired));
                 for i in 2.. {
                     let path: syn::Path = parse_quote! {#parent_path::#wanted};
                     match self.0.entry(path) {
@@ -942,22 +927,22 @@ impl TypeIdentTracker {
                 desired,
                 parent_path,
             } => {
-                let wanted = to_ident(&to_rust_typestr(&desired));
+                let wanted = to_ident(&to_rust_typestr(desired));
                 let path: syn::Path = parse_quote! {#parent_path::#wanted};
                 match self.0.entry(path) {
-                    Entry::Vacant(_) => panic!(format!(
+                    Entry::Vacant(_) => panic!(
                         "unable to claim reserved ident '{}' it hasn't been reserved",
                         &wanted
-                    )),
+                    ),
                     Entry::Occupied(mut entry) => match entry.get() {
                         IdentTrackerEntry::Reserved => {
                             *entry.get_mut() = IdentTrackerEntry::Assigned;
-                            return wanted;
+                            wanted
                         }
-                        IdentTrackerEntry::Assigned => panic!(format!(
+                        IdentTrackerEntry::Assigned => panic!(
                             "unable to claim reserved ident '{}' it's already been assigned",
                             &wanted
-                        )),
+                        ),
                     },
                 }
             }
@@ -1027,42 +1012,42 @@ impl Type {
             },
             TypeDesc::String => Type {
                 id: parse_quote! {String},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Bool => Type {
                 id: parse_quote! {bool},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Int32 => Type {
                 id: parse_quote! {i32},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Uint32 => Type {
                 id: parse_quote! {u32},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Float32 => Type {
                 id: parse_quote! {f32},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Int64 => Type {
                 id: parse_quote! {i64},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Uint64 => Type {
                 id: parse_quote! {u64},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Float64 => Type {
                 id: parse_quote! {f64},
-                parent_path: empty_type_path.clone(),
+                parent_path: empty_type_path,
                 type_desc,
             },
             TypeDesc::Bytes => Type {
@@ -1092,7 +1077,7 @@ impl Type {
                 let item_path = items.type_path();
                 Type {
                     id: parse_quote! {Vec<#item_path>},
-                    parent_path: empty_type_path.clone(),
+                    parent_path: empty_type_path,
                     type_desc,
                 }
             }
@@ -1268,7 +1253,7 @@ impl Type {
                                 if typ.requires_pointer_indirection_when_within(self, schemas) {
                                     type_path = parse_quote! {Box<#type_path>};
                                 }
-                                let mut field = make_field(&description, ident, type_path);
+                                let mut field = make_field(description, ident, type_path);
                                 field.attrs.extend(
                                     syn::Attribute::parse_outer
                                         .parse2(quote! {
@@ -1298,8 +1283,8 @@ impl Type {
                         } = &**boxed_prop_desc;
                         let add_props_type_path = typ.type_path();
                         let mut field = make_field(
-                            &description,
-                            &ident,
+                            description,
+                            ident,
                             parse_quote! {BTreeMap<String, #add_props_type_path},
                         );
                         use syn::parse::Parser;
@@ -1396,7 +1381,7 @@ impl Type {
         {
             match ref_or_type {
                 RefOrType::Ref(reference) => {
-                    if already_seen.iter().find(|&x| x == &reference).is_none() {
+                    if !already_seen.iter().any(|&x| x == reference) {
                         already_seen.push(reference);
                         let typ = schemas.get(reference).unwrap();
                         accum = _fold_nested_follow_refs(typ, schemas, accum, f, already_seen);
@@ -1610,10 +1595,7 @@ impl TypeDesc {
         disco_type: &discovery_parser::TypeDesc,
         ident_tracker: &mut TypeIdentTracker,
     ) -> TypeDesc {
-        match (
-            disco_type.typ.as_str(),
-            disco_type.format.as_ref().map(|x| x.as_str()),
-        ) {
+        match (disco_type.typ.as_str(), disco_type.format.as_deref()) {
             ("any", None) => TypeDesc::Any,
             ("boolean", None) => TypeDesc::Bool,
             ("integer", Some("uint32")) => TypeDesc::Uint32,
@@ -1646,7 +1628,7 @@ impl TypeDesc {
                                 .chain(std::iter::repeat(None)),
                         )
                         .map(|(value, description)| {
-                            let ident = to_ident(&to_rust_typestr(&value));
+                            let ident = to_ident(&to_rust_typestr(value));
                             EnumDesc {
                                 ident,
                                 description,
@@ -1677,8 +1659,7 @@ impl TypeDesc {
                             enums.extend(enum_descs.into_iter().filter(|enum_desc| {
                                 let lower_description = enum_desc
                                     .description
-                                    .as_ref()
-                                    .map(|s| s.as_str())
+                                    .as_deref()
                                     .unwrap_or("")
                                     .to_ascii_lowercase();
                                 !lower_description.contains("deprecated")
@@ -1692,7 +1673,7 @@ impl TypeDesc {
                 if let Some(ref items) = disco_type.items {
                     let item_type = RefOrType::from_disco_ref_or_type(
                         &format!("{}-items", id),
-                        &parent_path,
+                        parent_path,
                         items,
                         ident_tracker,
                     );
@@ -1709,11 +1690,11 @@ impl TypeDesc {
                     .properties
                     .iter()
                     .map(|(prop_id, DiscoPropDesc { description, typ })| {
-                        let prop_ident = to_ident(&to_rust_varstr(&prop_id));
+                        let prop_ident = to_ident(&to_rust_varstr(prop_id));
                         let ref_or_type = RefOrType::from_disco_ref_or_type(
                             &format!("{}-{}", id, prop_id),
-                            &parent_path,
-                            &typ,
+                            parent_path,
+                            typ,
                             ident_tracker,
                         );
                         (
@@ -1732,7 +1713,7 @@ impl TypeDesc {
                     let prop_id = format!("{}-additional-properties", &id);
                     let ref_or_type = RefOrType::from_disco_ref_or_type(
                         &prop_id,
-                        &parent_path,
+                        parent_path,
                         &prop_desc.typ,
                         ident_tracker,
                     );
@@ -1778,23 +1759,20 @@ fn any_method_supports_media(resources: &[Resource]) -> bool {
 }
 
 fn add_media_to_alt_param(params: &mut [Param]) {
-    if let Some(alt_param) = params.iter_mut().find(|p| p.id == "alt") {
-        if let Param {
-            typ:
-                Type {
-                    type_desc: TypeDesc::Enum(enum_desc),
-                    ..
-                },
+    if let Some(Param {
+        typ: Type {
+            type_desc: TypeDesc::Enum(enum_desc),
             ..
-        } = alt_param
-        {
-            if enum_desc.iter().find(|d| d.value == "media").is_none() {
-                enum_desc.push(EnumDesc {
-                    description: Some("Upload/Download media content".to_owned()),
-                    ident: parse_quote! {Media},
-                    value: "media".to_owned(),
-                })
-            }
+        },
+        ..
+    }) = params.iter_mut().find(|p| p.id == "alt")
+    {
+        if !enum_desc.iter().any(|d| d.value == "media") {
+            enum_desc.push(EnumDesc {
+                description: Some("Upload/Download media content".to_owned()),
+                ident: parse_quote! {Media},
+                value: "media".to_owned(),
+            })
         }
     }
 }
@@ -1820,13 +1798,13 @@ impl ScopeDesc {
         fn make_ident(mut scope: &str) -> syn::Ident {
             scope = scope.trim_start_matches("https://www.googleapis.com/auth/");
             scope = scope.trim_start_matches("https://");
-            scope = scope.trim_end_matches("/");
+            scope = scope.trim_end_matches('/');
             let mut scope = scope.replace(&['.', '/', '-'][..], "_");
             scope.make_ascii_uppercase();
             to_ident(&scope)
         }
         ScopeDesc {
-            ident: make_ident(&scope),
+            ident: make_ident(scope),
             value: scope.to_owned(),
             description: description.to_owned(),
         }

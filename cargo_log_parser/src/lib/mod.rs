@@ -51,7 +51,7 @@ impl From<&[u8]> for Line {
 pub fn parse_errors(input: &[u8]) -> IResult<&[u8], Vec<CrateWithError>> {
     fold_many0(
         |i: &[u8]| {
-            if i.len() == 0 {
+            if i.is_empty() {
                 return Err(nom::Err::Error((i, nom::error::ErrorKind::Eof)));
             }
             opt(alt((

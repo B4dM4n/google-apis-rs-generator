@@ -17,9 +17,9 @@ fn generate_resource(resource: &Resource, output: &mut String) {
         output.push(' ');
     }
     output.push_str("* ");
-    write!(
+    writeln!(
         output,
-        "[{}]({}/struct.{}.html)\n",
+        "[{}]({}/struct.{}.html)",
         &resource.ident,
         &mod_path,
         resource.action_type_name()

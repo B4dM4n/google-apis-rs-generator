@@ -25,7 +25,7 @@ pub(crate) fn cargo_toml(crate_name: &str, include_bytes_dep: bool, api: &shared
         .replace("{crate_name}", crate_name)
         .replace(
             "{crate_version}",
-            &api.lib_crate_version
+            api.lib_crate_version
                 .as_ref()
                 .expect("available crate version"),
         );

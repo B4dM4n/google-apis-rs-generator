@@ -8,7 +8,7 @@ use pulldown_cmark_to_cmark::fmt::cmark;
 pub fn sanitize(md: &str) -> String {
     let mut output = String::with_capacity(2048);
     cmark(
-        Parser::new_ext(&md, pulldown_cmark::Options::all()).map(|e| {
+        Parser::new_ext(md, pulldown_cmark::Options::all()).map(|e| {
             use pulldown_cmark::Event::*;
             match e {
                 Start(ref tag) => {

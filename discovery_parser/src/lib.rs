@@ -21,6 +21,7 @@ pub struct ErrorMsg {
     pub status: String,
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", untagged)]
 pub enum RestDescOrErr {
@@ -152,12 +153,12 @@ mod ref_target {
         reference: Cow<'a, str>,
     }
 
-    pub(super) fn serialize<S>(x: &String, serializer: S) -> Result<S::Ok, S::Error>
+    pub(super) fn serialize<S>(x: &str, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
         RefTarget {
-            reference: Cow::Borrowed(x.as_str()),
+            reference: Cow::Borrowed(x),
         }
         .serialize(serializer)
     }

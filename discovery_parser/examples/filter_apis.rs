@@ -1,5 +1,4 @@
 use discovery_parser::DiscoveryRestDesc;
-use reqwest;
 use serde::Deserialize;
 
 #[derive(Debug, Deserialize)]
@@ -43,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }) = &rest_desc.auth
         {
             for scope in scopes.keys() {
-                println!("{} -> {}", scope, const_id_for_scope(&scope));
+                println!("{} -> {}", scope, const_id_for_scope(scope));
             }
         }
     })?;
@@ -54,7 +53,7 @@ fn const_id_for_scope(mut scope: &str) -> String {
     const GOOGLE_AUTH_PREFIX: &str = "https://www.googleapis.com/auth/";
     scope = scope.trim_start_matches("https://www.googleapis.com/auth/");
     scope = scope.trim_start_matches("https://");
-    scope = scope.trim_end_matches("/");
+    scope = scope.trim_end_matches('/');
     let mut scope = scope.replace(&['.', '/', '-'][..], "_");
     scope.make_ascii_uppercase();
     scope

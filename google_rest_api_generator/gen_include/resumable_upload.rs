@@ -17,7 +17,7 @@ impl ResumableUpload {
         &self.url
     }
 
-    pub fn upload<R>(&mut self, mut reader: R) -> Result<(), Box<dyn::std::error::Error>>
+    pub fn upload<R>(&mut self, mut reader: R) -> Result<(), Box<dyn ::std::error::Error>>
     where
         R: ::std::io::Read + ::std::io::Seek + Send + 'static,
     {
@@ -61,7 +61,7 @@ impl ResumableUpload {
 
 fn parse_range_header(
     range: &::reqwest::header::HeaderValue,
-) -> Result<(i64, i64), Box<dyn::std::error::Error>> {
+) -> Result<(i64, i64), Box<dyn ::std::error::Error>> {
     let range = range.to_str()?;
     if !range.starts_with("bytes ") {
         return Err(r#"does not begin with "bytes""#.to_owned().into());
