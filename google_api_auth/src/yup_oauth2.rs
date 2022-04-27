@@ -30,7 +30,7 @@ where
 {
     fn access_token(&self) -> Result<String, Box<dyn ::std::error::Error + Send + Sync>> {
         let fut = self.auth.token(&self.scopes);
-        let mut runtime = ::tokio::runtime::Runtime::new().expect("unable to start tokio runtime");
+        let runtime = ::tokio::runtime::Runtime::new().expect("unable to start tokio runtime");
         Ok(runtime.block_on(fut)?.as_str().to_string())
     }
 }
