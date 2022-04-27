@@ -2,7 +2,7 @@ use super::CombinedMetadata;
 use crate::cli;
 use discovery_parser::DiscoveryRestDesc;
 use google_rest_api_generator::generate as generate_library;
-use std::{error::Error, path::Path};
+use std::{error::Error, fs, path::Path};
 
 pub enum Build {
     ApiAndCliInParallelNoErrorHandling,
@@ -17,6 +17,7 @@ pub fn generate(
     mode: Build,
 ) -> Result<(), Box<dyn Error>> {
     let constants = shared::Standard::default();
+    fs::create_dir_all(base_dir.as_ref())?;
     std::fs::write(
         base_dir.as_ref().join(constants.metadata_path),
         serde_json::to_string_pretty(&CombinedMetadata::default())?,
