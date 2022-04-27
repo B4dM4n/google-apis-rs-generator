@@ -82,6 +82,7 @@ fn fixup_deps(path: &Path, standard: &shared::Standard) -> Result<(), Box<dyn Er
         let dep = dependencies[name].as_inline_table_mut();
         if let Some(dep) = dep {
             dep.remove("git");
+            dep.remove("branch");
             dep.get_or_insert("path", format!("../../../../../{}", name));
         }
     }
