@@ -20,13 +20,30 @@ google_api_auth = { git = "https://github.com/B4dM4n/google-apis-rs-generator" }
 google_field_selector = { git = "https://github.com/B4dM4n/google-apis-rs-generator" }
 mime = "0.3"
 percent-encoding = "2"
-reqwest = { version = "0.11", default-features = false, features = ["json"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 textnonce = "1"
 "#;
 
-pub(crate) fn cargo_toml(crate_name: &str, include_bytes_dep: bool, api: &shared::Api) -> String {
+const DEP_REQWEST: &str = r#"
+reqwest = { version = "0.11", default-features = false, features = ["json"] }"#;
+
+const DEP_REQWEST_STREAM: &str = r#"
+reqwest = { version = "0.11", default-features = false, features = ["json", "stream"] }"#;
+
+const DEP_TOKIO_UTIL: &str = r#"
+tokio-util = { version = "0.7", features = ["compat", "io"] }"#;
+
+const DEP_GOOGLE_BYTES: &str = r#"
+google_api_bytes = { git = "https://github.com/B4dM4n/google-apis-rs-generator" }"#;
+
+pub(crate) fn cargo_toml(
+    crate_name: &str,
+    api: &shared::Api,
+    include_bytes_dep: bool,
+    include_reqwest_stream: bool,
+    include_tokio_util: bool,
+) -> String {
     let mut doc = CARGO_TOML
         .trim()
         .replace("{crate_name}", crate_name)
@@ -37,15 +54,20 @@ pub(crate) fn cargo_toml(crate_name: &str, include_bytes_dep: bool, api: &shared
                 .expect("available crate version"),
         );
 
-    // TODO: figure out a better way to determine if we should include stream reqwest feature
-    if crate_name.contains("storage") {
-        doc = doc.replace(r#"features = ["json"]"#, r#"features = ["stream", "json"]"#);
+    if include_reqwest_stream {
+        doc.push_str(DEP_REQWEST_STREAM)
+    } else {
+        doc.push_str(DEP_REQWEST)
+    }
+
+    if include_tokio_util {
+        doc.push_str(DEP_TOKIO_UTIL)
     }
 
     if include_bytes_dep {
-        doc.push_str("\n\n[dependencies.google_api_bytes]\n");
-        doc.push_str("git = \"https://github.com/B4dM4n/google-apis-rs-generator\"\n");
+        doc.push_str(DEP_GOOGLE_BYTES);
     }
+    doc.push('\n');
 
     doc
 }

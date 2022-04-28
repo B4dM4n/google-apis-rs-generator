@@ -74,7 +74,13 @@ pub fn generate(
             }
     });
 
-    let cargo_contents = cargo::cargo_toml(&api.lib_crate_name, any_bytes_types, &api);
+    let cargo_contents = cargo::cargo_toml(
+        &api.lib_crate_name,
+        &api,
+        any_bytes_types,
+        any_resumable_upload_methods,
+        any_resumable_upload_methods,
+    );
     std::fs::write(&cargo_toml_path, &cargo_contents)?;
 
     info!("api: writing lib '{}'", lib_path.display());
@@ -87,10 +93,9 @@ pub fn generate(
     rustfmt_writer.write_all(include_bytes!("../gen_include/percent_encode_consts.rs"))?;
     rustfmt_writer.write_all(include_bytes!("../gen_include/multipart.rs"))?;
     rustfmt_writer.write_all(include_bytes!("../gen_include/parsed_string.rs"))?;
-    // FIXME: refactor ResumableUpload to be async
-    // if any_resumable_upload_methods {
-    //     rustfmt_writer.write_all(include_bytes!("../gen_include/resumable_upload.rs"))?;
-    // }
+    if any_resumable_upload_methods {
+        rustfmt_writer.write_all(include_bytes!("../gen_include/resumable_upload.rs"))?;
+    }
     // FIXME: implement Stream instead of Iter so it is async
     // if any_iterable_methods {
     //     rustfmt_writer.write_all(include_bytes!("../gen_include/iter.rs"))?;

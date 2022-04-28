@@ -635,16 +635,16 @@ fn upload_methods(base_url: &str, method: &Method) -> TokenStream {
                             } else {
                                 Some(fields)
                             };
-                            
+
                             let req = self._request(&self._simple_upload_path()).await?;
                             let req = req.query(&[("uploadType", "multipart")]);
 
                             let mut multipart = RelatedMultiPart::new();
                             #add_request_part
                             multipart.new_part(Part::new(mime_type, Box::new(content)));
-                            
+
                             let req = req.header(::reqwest::header::CONTENT_TYPE, format!("multipart/related; boundary={}", multipart.boundary()));
-                            
+
                             let mut body: Vec<u8> = vec![];
                             let mut reader = multipart.into_reader();
                             let _num_bytes = reader.read_to_end(&mut body).await?;
@@ -667,18 +667,18 @@ fn upload_methods(base_url: &str, method: &Method) -> TokenStream {
 
                             let req = self._request(&self._simple_upload_path()).await?;
                             let req = req.query(&[("uploadType", "multipart")]);
-                            
+
                             let mut multipart = RelatedMultiPart::new();
                             #add_request_part
                             multipart.new_part(Part::new(mime_type, Box::new(content)));
-                           
+
                             let req = req.header(::reqwest::header::CONTENT_TYPE, format!("multipart/related; boundary={}", multipart.boundary()));
 
                             let mut body: Vec<u8> = vec![];
                             let mut reader = multipart.into_reader();
                             let _num_bytes = reader.read_to_end(&mut body).await?;
                             let req = req.body(body);
-                            
+
                             req.send().await?.error_for_status()?;
 
                             Ok(())
@@ -723,10 +723,9 @@ fn upload_methods(base_url: &str, method: &Method) -> TokenStream {
             }
         });
 
-        // FIXME: refactor ResumableUpload to be async
         quote! {
             #simple_fns
-            // #resumable_fns
+            #resumable_fns
         }
     } else {
         quote! {}

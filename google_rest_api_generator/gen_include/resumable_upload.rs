@@ -19,19 +19,27 @@ impl ResumableUpload {
 
     pub async fn upload<R>(&mut self, mut reader: R) -> Result<(), Box<dyn ::std::error::Error>>
     where
-        R: ::std::io::Read + ::std::io::Seek + Send + 'static,
+        R: ::futures::io::AsyncRead
+            + ::futures::io::AsyncSeek
+            + ::std::marker::Unpin
+            + Send
+            + Sync
+            + 'static,
     {
+        use ::futures::io::AsyncSeekExt;
+        use ::tokio_util::compat::FuturesAsyncReadCompatExt;
+
         let reader_len = {
-            let start = reader.seek(::std::io::SeekFrom::Current(0))?;
-            let end = reader.seek(::std::io::SeekFrom::End(0))?;
-            reader.seek(::std::io::SeekFrom::Start(start))?;
+            let start = reader.seek(::std::io::SeekFrom::Current(0)).await?;
+            let end = reader.seek(::std::io::SeekFrom::End(0)).await?;
+            reader.seek(::std::io::SeekFrom::Start(start)).await?;
             end
         };
         let progress = match self.progress {
             Some(progress) => progress,
             None => {
                 let req = self.reqwest.request(::reqwest::Method::PUT, &self.url);
-                let req = req.header(::reqwest::header::CONTENT_LENGTH, 0);
+                let req = req.header(::reqwest::header::CONTENT_LENGTH, 0_i16);
                 let req = req.header(
                     ::reqwest::header::CONTENT_RANGE,
                     format!("bytes */{}", reader_len),
@@ -48,12 +56,14 @@ impl ResumableUpload {
             }
         };
 
-        reader.seek(::std::io::SeekFrom::Start(progress as u64))?;
-        let content_length = reader_len - progress as u64;
+        reader
+            .seek(::std::io::SeekFrom::Start(progress as u64))
+            .await?;
+        let reader_stream = ::tokio_util::io::ReaderStream::new(reader.compat());
         let content_range = format!("bytes {}-{}/{}", progress, reader_len - 1, reader_len);
         let req = self.reqwest.request(::reqwest::Method::PUT, &self.url);
         let req = req.header(::reqwest::header::CONTENT_RANGE, content_range);
-        let req = req.body(::reqwest::Body::sized(reader, content_length));
+        let req = req.body(::reqwest::Body::wrap_stream(reader_stream));
         req.send().await?.error_for_status()?;
         Ok(())
     }
