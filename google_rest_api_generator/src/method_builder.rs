@@ -104,12 +104,11 @@ pub(crate) fn generate(
     );
     let request_method = request_method(&method.http_method, all_params);
     let exec_method = exec_method(method.request.as_ref(), method.response.as_ref());
-    let (iter_methods, iter_types_and_impls) = iter_defs(method, schemas);
+    let (stream_methods, stream_types_and_impls) = stream_defs(method, schemas);
     let download_method = download_method(&base_url, method);
     let upload_methods = upload_methods(root_url, method);
     let builder_doc = builder_doc(method, creator_ident);
 
-    // FIXME: implement Stream instead of Iter so it is async
     quote! {
         #[doc = #builder_doc]
         #[derive(Debug,Clone)]
@@ -122,7 +121,7 @@ pub(crate) fn generate(
         impl<'a> #builder_name<'a> {
             #(#param_methods)*
 
-            // #iter_methods
+            #stream_methods
             #download_method
             #upload_methods
             #exec_method
@@ -131,7 +130,7 @@ pub(crate) fn generate(
             #request_method
         }
 
-       // #iter_types_and_impls
+        #stream_types_and_impls
     }
 }
 
@@ -407,25 +406,28 @@ fn request_method<'a>(http_method: &str, params: impl Iterator<Item = &'a Param>
     }
 }
 
-fn iterable_method_impl(method: &Method) -> TokenStream {
+fn streamable_method_impl(method: &Method) -> TokenStream {
     let builder_name = method.builder_name();
     quote! {
-        impl<'a> crate::iter::IterableMethod for #builder_name<'a> {
+        #[async_trait::async_trait]
+        impl<'a> crate::stream::StreamableMethod for #builder_name<'a> {
             fn set_page_token(&mut self, value: String) {
                 self.page_token = value.into();
             }
-
-            fn execute<T>(&mut self) -> Result<T, crate::Error>
+            async fn execute<T>(&mut self) -> Result<T, crate::Error>
             where
-                T: ::serde::de::DeserializeOwned,
+                T: crate::GetNextPageToken + ::serde::de::DeserializeOwned,
             {
-                self._execute()
+                self._execute().await
             }
         }
     }
 }
 
-fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStream, TokenStream) {
+fn stream_defs(
+    method: &Method,
+    schemas: &BTreeMap<syn::Ident, Type>,
+) -> (TokenStream, TokenStream) {
     use crate::PageTokenParam;
     let page_token_param = method.is_iterable(schemas);
     if page_token_param == PageTokenParam::None {
@@ -446,25 +448,70 @@ fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStr
         } else {
             panic!("is_iterable that doesn't return an object");
         };
-    let array_iter_methods = array_props.iter().map(|(prop, items_type)| {
+    let array_stream_methods = array_props.iter().map(|(prop, items_type)| {
         let prop_id = &prop.id;
-        let iter_method_ident: syn::Ident =
-            to_ident(&to_rust_varstr(&format!("iter_{}", &prop.ident)));
-        let iter_method_ident_default: syn::Ident =
-            to_ident(&to_rust_varstr(&format!("{}_with_default_fields", &iter_method_ident)));
-        let iter_method_ident_all: syn::Ident =
-            to_ident(&to_rust_varstr(&format!("{}_with_all_fields", &iter_method_ident)));
-        let iter_method_ident_fields: syn::Ident =
-            to_ident(&to_rust_varstr(&format!("{}_with_fields", &iter_method_ident)));
+        let stream_method_ident: syn::Ident =
+            to_ident(&to_rust_varstr(&format!("stream_{}", &prop.ident)));
+        let stream_method_ident_default: syn::Ident = to_ident(&to_rust_varstr(&format!(
+            "{}_with_default_fields",
+            &stream_method_ident
+        )));
+        let stream_method_ident_all: syn::Ident = to_ident(&to_rust_varstr(&format!(
+            "{}_with_all_fields",
+            &stream_method_ident
+        )));
+        let stream_method_ident_fields: syn::Ident = to_ident(&to_rust_varstr(&format!(
+            "{}_with_fields",
+            &stream_method_ident
+        )));
+
+        let stream_method_doc = format!(
+            r#"
+Execute the request and yield each item in the `{0}` list. If the response contains a
+`nextPageToken`, the request is executed again with the new token. This process is
+repeated until no page token is returned.
+
+Requests the field given by the [`FieldSelector`] implementation from the server.
+
+[`FieldSelector`]: ::google_field_selector::FieldSelector
+"#,
+            prop_id
+        );
+        let stream_method_doc_default = format!(
+            r#"
+Execute the request and yield each item in the `{0}` list. If the response contains a
+`nextPageToken`, the request is executed again with the new token. This process is
+repeated until no page token is returned.
+
+Requests the default set of fields from the server.
+"#,
+            prop_id
+        );
+        let stream_method_doc_all = format!(
+            r#"
+Execute the request and yield each item in the `{0}` list. If the response contains a
+`nextPageToken`, the request is executed again with the new token. This process is
+repeated until no page token is returned.
+
+Requests all fields from the server.
+"#,
+            prop_id
+        );
+        let stream_method_doc_fields = format!(
+            r#"
+Execute the request and yield each item in the `{0}` list. If the response contains a
+`nextPageToken`, the request is executed again with the new token. This process is
+repeated until no page token is returned.
+
+Only the given `fields` are requested from the server.
+"#,
+            prop_id
+        );
         quote! {
-            /// Return an iterator that iterates over all `#prop_ident`. The
-            /// items yielded by the iterator are chosen by the caller of this
-            /// method and must implement `Deserialize` and `FieldSelector`. The
-            /// populated fields in the yielded items will be determined by the
-            /// `FieldSelector` implementation.
-            pub fn #iter_method_ident<T>(self) -> crate::iter::PageItemIter<Self, T>
+            #[doc = #stream_method_doc]
+            pub fn #stream_method_ident<T>(self) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
             where
-                T: ::serde::de::DeserializeOwned + ::google_field_selector::FieldSelector,
+                T: ::serde::de::DeserializeOwned + ::google_field_selector::FieldSelector + 'a,
             {
                 let fields = ::google_field_selector::to_string::<T>();
                 let fields: Option<String> = if fields.is_empty() {
@@ -472,32 +519,52 @@ fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStr
                 } else {
                     Some(fields)
                 };
-                self.#iter_method_ident_fields(fields)
+                self.#stream_method_ident_fields(fields)
             }
 
-            /// Return an iterator that iterates over all `#prop_ident`. The
-            /// items yielded by the iterator are `#items_type`. The populated
-            /// fields in `#items_type` will be the default fields populated by
-            /// the server.
-            pub fn #iter_method_ident_default(self) -> crate::iter::PageItemIter<Self, #items_type> {
-                self.#iter_method_ident_fields(None::<String>)
+            #[doc = #stream_method_doc_default]
+            pub fn #stream_method_ident_default(
+                self
+            ) -> impl ::futures::Stream<Item = Result<#items_type, crate::Error>> + 'a {
+                self.#stream_method_ident_fields(None::<String>)
             }
 
-            /// Return an iterator that iterates over all `#prop_ident`. The
-            /// items yielded by the iterator are `#items_type`. The populated
-            /// fields in `#items_type` will be all fields available. This should
-            /// primarily be used during developement and debugging as fetching
-            /// all fields can be expensive both in bandwidth and server
-            /// resources.
-            pub fn #iter_method_ident_all(self) -> crate::iter::PageItemIter<Self, #items_type> {
-                self.#iter_method_ident_fields(Some("*"))
+            #[doc = #stream_method_doc_all]
+            pub fn #stream_method_ident_all(
+                self
+            ) -> impl ::futures::Stream<Item = Result<#items_type, crate::Error>> + 'a {
+                self.#stream_method_ident_fields(Some("*"))
             }
 
-            pub fn #iter_method_ident_fields<T, F>(mut self, fields: Option<F>) -> crate::iter::PageItemIter<Self, T>
+            #[doc = #stream_method_doc_fields]
+            pub fn #stream_method_ident_fields<T, F>(
+                mut self,
+                fields: Option<F>
+            ) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
             where
-                T: ::serde::de::DeserializeOwned,
+                T: ::serde::de::DeserializeOwned + 'a,
                 F: AsRef<str>,
             {
+                #[derive(::serde::Deserialize, ::serde::Serialize)]
+                struct Page<T> {
+                    #[serde(rename = "nextPageToken")]
+                    pub next_page_token: ::std::option::Option<String>,
+                    #[serde(rename = #prop_id)]
+                    pub items: Vec<T>,
+                }
+                impl<T> crate::GetNextPageToken for Page<T> {
+                    fn next_page_token(&self) -> ::std::option::Option<String> {
+                        self.next_page_token.to_owned()
+                    }
+                }
+                impl<T> crate::stream::IntoPageItems for Page<T> {
+                    type Items = Vec<T>;
+
+                    fn into_page_items(self) -> Self::Items {
+                        self.items
+                    }
+                }
+
                 self.fields = Some({
                     let mut selector = concat!("nextPageToken,", #prop_id).to_owned();
                     let items_fields = fields.as_ref().map(|x| x.as_ref()).unwrap_or("");
@@ -508,17 +575,28 @@ fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStr
                     }
                     selector
                 });
-                crate::iter::PageItemIter::new(self, #prop_id)
+                crate::stream::page_item_stream::<_, Page<T>>(self)
             }
         }
     });
 
-    let iter_methods = quote! {
-        #(#array_iter_methods)*
+    let stream_methods = quote! {
+        #(#array_stream_methods)*
 
-        pub fn iter<T>(self) -> crate::iter::PageIter<Self, T>
+        /// Execute the request and yield the returned value. If [`next_page_token`] returns a value,
+        /// the request is executed again with the new token. This process is repeated until no page
+        /// token is returned.
+        ///
+        /// Requests the field given by the [`FieldSelector`] implementation from the server.
+        ///
+        /// [`next_page_token`]: crate::GetNextPageToken::next_page_token
+        /// [`FieldSelector`]: ::google_field_selector::FieldSelector
+        pub fn stream<T>(self) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
         where
-            T: ::serde::de::DeserializeOwned + ::google_field_selector::FieldSelector,
+            T: crate::GetNextPageToken
+                + ::serde::de::DeserializeOwned
+                + ::google_field_selector::FieldSelector
+                + 'a,
         {
             let fields = ::google_field_selector::to_string::<T>();
             let fields: Option<String> = if fields.is_empty() {
@@ -526,20 +604,45 @@ fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStr
             } else {
                 Some(fields)
             };
-            self.iter_with_fields(fields)
+            self.stream_with_fields(fields)
         }
 
-        pub fn iter_with_default_fields(self) -> crate::iter::PageIter<Self, #response_type_path> {
-            self.iter_with_fields(None::<&str>)
+        /// Execute the request and yield the returned value. If the response contains a
+        /// `nextPageToken`, the request is executed again with the new token. This process is
+        /// repeated until no page token is returned.
+        ///
+        /// Requests the default set of fields from the server.
+        pub fn stream_with_default_fields(
+            self
+        ) -> impl ::futures::Stream<Item = Result<#response_type_path, crate::Error>> + 'a {
+            self.stream_with_fields(None::<&str>)
         }
 
-        pub fn iter_with_all_fields(self) -> crate::iter::PageIter<Self, #response_type_path> {
-            self.iter_with_fields(Some("*"))
+        /// Execute the request and yield the returned value. If the response contains a
+        /// `nextPageToken`, the request is executed again with the new token. This process is
+        /// repeated until no page token is returned.
+        ///
+        /// Requests all fields from the server.
+        pub fn stream_with_all_fields(
+            self
+        ) -> impl ::futures::Stream<Item = Result<#response_type_path, crate::Error>> + 'a {
+            self.stream_with_fields(Some("*"))
         }
 
-        pub fn iter_with_fields<T, F>(mut self, fields: Option<F>) -> crate::iter::PageIter<Self, T>
+        /// Execute the request and yield the returned value. If [`next_page_token`] returns a value,
+        /// the request is executed again with the new token. This process is repeated until no page
+        /// token is returned.
+        ///
+        /// Only the given `fields` are requested from the server. If the list of fields is not
+        /// empty, the `nextPageToken` field will be added to the list.
+        ///
+        /// [`next_page_token`]: crate::GetNextPageToken::next_page_token
+        pub fn stream_with_fields<T, F>(
+            mut self,
+            fields: Option<F>
+        ) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
         where
-            T: ::serde::de::DeserializeOwned,
+            T: crate::GetNextPageToken + ::serde::de::DeserializeOwned + 'a,
             F: AsRef<str>,
         {
             let mut fields = fields.as_ref().map(|x| x.as_ref()).unwrap_or("").to_owned();
@@ -558,12 +661,12 @@ fn iter_defs(method: &Method, schemas: &BTreeMap<syn::Ident, Type>) -> (TokenStr
                 fields.push_str("nextPageToken");
                 self.fields = Some(fields);
             }
-            crate::iter::PageIter::new(self)
+            crate::stream::page_stream(self)
         }
     };
 
-    let iterable_method_impl = iterable_method_impl(method);
-    (iter_methods, iterable_method_impl)
+    let streamable_method_impl = streamable_method_impl(method);
+    (stream_methods, streamable_method_impl)
 }
 
 fn download_method(base_url: &str, method: &Method) -> TokenStream {

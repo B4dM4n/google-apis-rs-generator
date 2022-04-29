@@ -77,9 +77,12 @@ pub fn generate(
     let cargo_contents = cargo::cargo_toml(
         &api.lib_crate_name,
         &api,
-        any_bytes_types,
-        any_resumable_upload_methods,
-        any_resumable_upload_methods,
+        cargo::IncludeDeps {
+            google_bytes: any_bytes_types,
+            reqwest_with_stream: any_resumable_upload_methods,
+            tokio_util: any_resumable_upload_methods,
+            async_trait: any_iterable_methods,
+        },
     );
     std::fs::write(&cargo_toml_path, &cargo_contents)?;
 
@@ -93,13 +96,13 @@ pub fn generate(
     rustfmt_writer.write_all(include_bytes!("../gen_include/percent_encode_consts.rs"))?;
     rustfmt_writer.write_all(include_bytes!("../gen_include/multipart.rs"))?;
     rustfmt_writer.write_all(include_bytes!("../gen_include/parsed_string.rs"))?;
+    rustfmt_writer.write_all(include_bytes!("../gen_include/next_page_token.rs"))?;
     if any_resumable_upload_methods {
         rustfmt_writer.write_all(include_bytes!("../gen_include/resumable_upload.rs"))?;
     }
-    // FIXME: implement Stream instead of Iter so it is async
-    // if any_iterable_methods {
-    //     rustfmt_writer.write_all(include_bytes!("../gen_include/iter.rs"))?;
-    // }
+    if any_iterable_methods {
+        rustfmt_writer.write_all(include_bytes!("../gen_include/stream.rs"))?;
+    }
     rustfmt_writer.close()?;
     info!("api: generated and formatted in {:?}", time.elapsed());
     info!("api: done in {:?}", total_time.elapsed());
@@ -1241,6 +1244,7 @@ impl Type {
                     // treated as BTreeMap's and don't need a type definition.
                     None
                 } else {
+                    let mut has_next_page_token = false;
                     let mut fields: Vec<syn::Field> = props
                         .iter()
                         .map(
@@ -1255,6 +1259,9 @@ impl Type {
                                 },
                             )| {
                                 use syn::parse::Parser;
+                                if id == "nextPageToken" {
+                                   has_next_page_token = true;
+                                }
                                 let typ = ref_or_type.get_type(schemas);
                                 let mut type_path = syn::Type::Path(typ.type_path());
                                 if typ.requires_pointer_indirection_when_within(self, schemas) {
@@ -1304,6 +1311,16 @@ impl Type {
                         );
                         fields.push(field);
                     }
+                    let mut get_next_page_token_impl = None;
+                    if has_next_page_token {
+                        get_next_page_token_impl = Some(quote! {
+                            impl crate::GetNextPageToken for #name {
+                                fn next_page_token(&self) -> ::std::option::Option<String> {
+                                    self.next_page_token.to_owned()
+                                }
+                            }
+                        });
+                    }
                     if props.is_empty() && add_props.is_none() {
                         derives.push(quote! {Copy});
                     }
@@ -1327,6 +1344,8 @@ impl Type {
                                 ::google_field_selector::FieldType::Leaf
                             }
                         }
+
+                        #get_next_page_token_impl
                     })
                 }
             }
