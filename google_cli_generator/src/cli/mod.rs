@@ -1,4 +1,6 @@
 use discovery_parser::DiscoveryRestDesc;
+use liquid::Object;
+use liquid_core::Value;
 use log::info;
 use std::{
     cmp::Ordering, convert::TryFrom, error::Error, ffi::OsStr, fs, io::Write, path::Path,
@@ -38,7 +40,7 @@ pub fn generate(
     rustfmt_writer.write_all(MAIN_RS.as_bytes())?;
 
     let templates_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("templates");
-    let engine = liquid::ParserBuilder::with_liquid()
+    let engine = liquid::ParserBuilder::with_stdlib()
         .filter(liquid_filters::RustStringLiteral)
         .build()?;
     let model = into_liquid_object(Model::new(api, discovery_desc, &api_desc))?;
@@ -77,11 +79,11 @@ pub fn generate(
     Ok(())
 }
 
-fn into_liquid_object(src: impl serde::Serialize) -> Result<liquid::value::Object, Box<dyn Error>> {
+fn into_liquid_object(src: impl serde::Serialize) -> Result<Object, Box<dyn Error>> {
     let src = serde_json::to_value(src)?;
     let dst = serde_json::from_value(src)?;
     match dst {
-        liquid::value::Value::Object(obj) => Ok(obj),
+        Value::Object(obj) => Ok(obj),
         _ => Err("Data model root must be an object".to_owned().into()),
     }
 }

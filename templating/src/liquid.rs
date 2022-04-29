@@ -53,7 +53,7 @@ pub fn substitute(
     validate(input_data, specs)?;
     let dataset = substitute_in_data(dataset, replacements);
     let (engine, dataset) = (
-        liquid::ParserBuilder::with_liquid().build()?,
+        liquid::ParserBuilder::with_stdlib().build()?,
         into_liquid_object(dataset)?,
     );
 
@@ -127,10 +127,10 @@ pub fn substitute(
     Ok(())
 }
 
-fn into_liquid_object(src: json::Value) -> Result<liquid::value::Object, Error> {
+fn into_liquid_object(src: json::Value) -> Result<liquid::Object, Error> {
     let dst = json::from_value(src)?;
     match dst {
-        liquid::value::Value::Object(obj) => Ok(obj),
+        liquid::model::Value::Object(obj) => Ok(obj),
         _ => Err(err_msg("Data model root must be an object")),
     }
 }

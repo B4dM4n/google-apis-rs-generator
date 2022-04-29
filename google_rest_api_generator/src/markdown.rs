@@ -1,5 +1,5 @@
-use pulldown_cmark::Parser;
-use pulldown_cmark_to_cmark::fmt::cmark;
+use pulldown_cmark::{CodeBlockKind, Parser};
+use pulldown_cmark_to_cmark::cmark;
 
 /// Currently does the following
 /// * look for code blocks, and rewrite them as 'text'. Sometimes, these are code in any other language, thus far never in Rust.
@@ -14,7 +14,12 @@ pub fn sanitize(md: &str) -> String {
                 Start(ref tag) => {
                     use pulldown_cmark::Tag::*;
                     match tag {
-                        CodeBlock(code) => Start(CodeBlock(format!("text{}", code).into())),
+                        CodeBlock(CodeBlockKind::Indented) => {
+                            Start(CodeBlock(CodeBlockKind::Fenced("text".into())))
+                        }
+                        CodeBlock(CodeBlockKind::Fenced(code)) => Start(CodeBlock(
+                            CodeBlockKind::Fenced(format!("text{}", code).into()),
+                        )),
                         _ => e,
                     }
                 }
@@ -22,7 +27,6 @@ pub fn sanitize(md: &str) -> String {
             }
         }),
         &mut output,
-        None,
     )
     .unwrap();
     output

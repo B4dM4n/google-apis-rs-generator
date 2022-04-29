@@ -38,10 +38,10 @@ fn write_artifacts(
 }
 
 fn fetch_spec(api: &Api) -> Result<DiscoveryRestDesc, Error> {
-    reqwest::get(&api.rest_url)
+    reqwest::blocking::get(&api.rest_url)
         .with_context(|_| format_err!("Could not fetch spec from '{}'", api.rest_url))
         .map_err(Error::from)
-        .and_then(|mut r: reqwest::Response| {
+        .and_then(|r: reqwest::blocking::Response| {
             let res: RestDescOrErr = r.json().with_context(|_| {
                 format_err!("Could not deserialize spec at '{}'", api.rest_url)
             })?;

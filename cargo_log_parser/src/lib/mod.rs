@@ -3,6 +3,7 @@ use nom::{
     bytes::{streaming::tag, streaming::take_till, streaming::take_till1},
     character::streaming::line_ending,
     combinator::{complete, map, map_parser, map_res, opt},
+    error::ParseError,
     multi::fold_many0,
     sequence::{delimited, terminated, tuple},
     IResult,
@@ -48,18 +49,21 @@ impl From<&[u8]> for Line {
     }
 }
 
-pub fn parse_errors(input: &[u8]) -> IResult<&[u8], Vec<CrateWithError>> {
+pub fn parse_errors<'i>(input: &'i [u8]) -> IResult<&'i [u8], Vec<CrateWithError>> {
     fold_many0(
-        |i: &[u8]| {
+        |i: &'i [u8]| {
             if i.is_empty() {
-                return Err(nom::Err::Error((i, nom::error::ErrorKind::Eof)));
+                return Err(nom::Err::Error(nom::error::Error::from_error_kind(
+                    i,
+                    nom::error::ErrorKind::Eof,
+                )));
             }
             opt(alt((
                 map(complete(line_with_error), Line::from),
                 map(line_without_ending, Line::from),
             )))(i)
         },
-        Vec::new(),
+        Vec::new,
         |mut acc, c| {
             if let Some(Line::Error(c)) = c {
                 acc.push(c);

@@ -22,11 +22,9 @@ struct Opt {
 /// Otherwise, prefer using the machinery in https://github.com/google-apis-rs/generated to
 /// generate any API, CLI and more
 fn main() -> Result<(), Box<dyn Error>> {
-    ::env_logger::builder()
-        .default_format_timestamp_nanos(true)
-        .init();
+    ::env_logger::builder().format_timestamp_nanos().init();
     let opt = Opt::from_args();
-    let desc: DiscoveryRestDesc = reqwest::get(&format!(
+    let desc: DiscoveryRestDesc = reqwest::blocking::get(&format!(
         "https://www.googleapis.com/discovery/v1/apis/{}/{}/rest",
         &opt.name, &opt.version
     ))?

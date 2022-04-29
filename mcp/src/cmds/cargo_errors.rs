@@ -65,7 +65,7 @@ pub fn execute(
                 Err(nom::Err::Incomplete(needed)) => {
                     match needed {
                         nom::Needed::Unknown => 1, // read one byte
-                        nom::Needed::Size(len) => len,
+                        nom::Needed::Size(len) => len.into(),
                     }
                 }
                 Err(nom::Err::Failure(_e)) | Err(nom::Err::Error(_e)) => {
@@ -102,7 +102,7 @@ pub fn execute(
                 excludes.extend(filter_parse_result(parsed));
             }
             Err(nom::Err::Error(e)) | Err(nom::Err::Failure(e)) => {
-                error!("Ignoring parse error after cargo ended: {:?}", e.1);
+                error!("Ignoring parse error after cargo ended: {:?}", e.code);
             }
             Err(nom::Err::Incomplete(_)) => panic!(
                 "Could not parse remaining input: {:?}",

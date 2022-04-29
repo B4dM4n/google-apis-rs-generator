@@ -1,8 +1,5 @@
-use liquid::compiler::Filter;
-use liquid::derive::*;
-use liquid::error::Result;
-use liquid::interpreter::Context;
-use liquid::value::Value;
+use liquid_core::{Display_filter, Filter, FilterReflection, Result, Runtime, Value, ValueView};
+use liquid_derive::ParseFilter;
 
 #[derive(Clone, ParseFilter, FilterReflection)]
 #[filter(
@@ -17,7 +14,7 @@ pub struct RustStringLiteral;
 struct RustStringLiteralFilter;
 
 impl Filter for RustStringLiteralFilter {
-    fn evaluate(&self, input: &Value, _context: &Context) -> Result<Value> {
-        Ok(Value::scalar(format!("{:?}", input.to_str())))
+    fn evaluate(&self, input: &dyn ValueView, _runtime: &dyn Runtime) -> Result<Value> {
+        Ok(Value::scalar(format!("{:?}", input.to_kstr())))
     }
 }

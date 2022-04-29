@@ -4,7 +4,7 @@ use nom::{
     bytes::complete::{tag, take_while1, take_while_m_n},
     character::complete::digit1,
     combinator::{all_consuming, map, map_res, opt, recognize},
-    multi::{many0, many1, separated_nonempty_list},
+    multi::{many0, many1, separated_list1},
     sequence::{delimited, tuple},
     IResult,
 };
@@ -120,7 +120,7 @@ fn expression(input: &str) -> IResult<&str, Expression> {
     delimited(
         char('{'),
         map(
-            tuple((operator, separated_nonempty_list(char(','), var_spec))),
+            tuple((operator, separated_list1(char(','), var_spec))),
             |(operator, var_spec_list)| Expression {
                 operator,
                 var_spec_list,

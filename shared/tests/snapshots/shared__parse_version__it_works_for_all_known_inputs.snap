@@ -1,7 +1,5 @@
 ---
-created: "2019-08-19T08:12:56.238951Z"
-creator: insta@0.10.1
-source: mcp/src/shared.rs
+source: shared/tests/shared.rs
 expression: expected
 ---
 alpha alpha
