@@ -11,7 +11,7 @@ pub(crate) fn generate(api_desc: &APIDesc) -> String {
 
 fn generate_resource(resource: &Resource, output: &mut String) {
     let mod_path = module_path(resource);
-    let indent_amount = resource.parent_path.segments.len();
+    let indent_amount = resource.parent_path.segments.len().saturating_sub(2);
     use fmt::Write;
     for _ in 0..indent_amount * 2 {
         output.push(' ');
