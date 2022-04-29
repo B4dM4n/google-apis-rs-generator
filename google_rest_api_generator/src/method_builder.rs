@@ -47,7 +47,7 @@ pub(crate) fn generate(
         use syn::parse::Parser;
         syn::Field::parse_named
             .parse2(quote! {
-                #ident: Option<#ty>
+                #ident: ::std::option::Option<#ty>
             })
             .expect("failed to parse param field")
     }));
@@ -159,7 +159,7 @@ fn exec_method(
                     T: ::serde::de::DeserializeOwned + ::google_field_selector::FieldSelector,
                 {
                     let fields = ::google_field_selector::to_string::<T>();
-                    let fields: Option<String> = if fields.is_empty() {
+                    let fields: ::std::option::Option<String> = if fields.is_empty() {
                         None
                     } else {
                         Some(fields)
@@ -187,7 +187,7 @@ fn exec_method(
                 /// Execute the given operation. This will use the `fields`
                 /// selector provided and will deserialize the response into
                 /// whatever return value is provided.
-                pub async fn execute_with_fields<T, F>(mut self, fields: Option<F>) -> Result<T, crate::Error>
+                pub async fn execute_with_fields<T, F>(mut self, fields: ::std::option::Option<F>) -> Result<T, crate::Error>
                 where
                     T: ::serde::de::DeserializeOwned,
                     F: Into<String>,
@@ -514,7 +514,7 @@ Only the given `fields` are requested from the server.
                 T: ::serde::de::DeserializeOwned + ::google_field_selector::FieldSelector + 'a,
             {
                 let fields = ::google_field_selector::to_string::<T>();
-                let fields: Option<String> = if fields.is_empty() {
+                let fields: ::std::option::Option<String> = if fields.is_empty() {
                     None
                 } else {
                     Some(fields)
@@ -539,7 +539,7 @@ Only the given `fields` are requested from the server.
             #[doc = #stream_method_doc_fields]
             pub fn #stream_method_ident_fields<T, F>(
                 mut self,
-                fields: Option<F>
+                fields: ::std::option::Option<F>
             ) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
             where
                 T: ::serde::de::DeserializeOwned + 'a,
@@ -599,7 +599,7 @@ Only the given `fields` are requested from the server.
                 + 'a,
         {
             let fields = ::google_field_selector::to_string::<T>();
-            let fields: Option<String> = if fields.is_empty() {
+            let fields: ::std::option::Option<String> = if fields.is_empty() {
                 None
             } else {
                 Some(fields)
@@ -639,7 +639,7 @@ Only the given `fields` are requested from the server.
         /// [`next_page_token`]: crate::GetNextPageToken::next_page_token
         pub fn stream_with_fields<T, F>(
             mut self,
-            fields: Option<F>
+            fields: ::std::option::Option<F>
         ) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
         where
             T: crate::GetNextPageToken + ::serde::de::DeserializeOwned + 'a,
