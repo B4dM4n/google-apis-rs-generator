@@ -1,9 +1,13 @@
-use hyper::client::connect::Connect;
+use hyper::{client::connect::Connection, service::Service, Uri};
+use tokio::io::{AsyncRead, AsyncWrite};
 use yup_oauth2::authenticator::Authenticator;
 
 pub fn from_authenticator<C, I, S>(auth: Authenticator<C>, scopes: I) -> impl crate::GetAccessToken
 where
-    C: Connect + Clone + Send + Sync + 'static,
+    C: Service<Uri> + Clone + Send + Sync + 'static,
+    C::Response: Connection + AsyncRead + AsyncWrite + Send + Unpin + 'static,
+    C::Future: Send + Unpin + 'static,
+    C::Error: Into<Box<dyn ::std::error::Error + Send + Sync>>,
     I: IntoIterator<Item = S>,
     S: Into<String>,
 {
@@ -20,17 +24,26 @@ struct YupAuthenticator<C> {
 
 impl<T> ::std::fmt::Debug for YupAuthenticator<T> {
     fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
-        write!(f, "{}", "YupAuthenticator{..}")
+        write!(f, "YupAuthenticator{{..}}")
     }
 }
 
 #[async_trait::async_trait]
 impl<C> crate::GetAccessToken for YupAuthenticator<C>
 where
-    C: Connect + Clone + Send + Sync + 'static,
+    C: Service<Uri> + Clone + Send + Sync + 'static,
+    C::Response: Connection + AsyncRead + AsyncWrite + Send + Unpin + 'static,
+    C::Future: Send + Unpin + 'static,
+    C::Error: Into<Box<dyn ::std::error::Error + Send + Sync>>,
 {
     async fn access_token(&self) -> Result<String, Box<dyn ::std::error::Error + Send + Sync>> {
-        Ok(self.auth.token(&self.scopes).await?.as_str().to_string())
+        Ok(self
+            .auth
+            .token(&self.scopes)
+            .await?
+            .token()
+            .ok_or("authenticator did not produce an access_token")?
+            .to_string())
     }
 }
 
