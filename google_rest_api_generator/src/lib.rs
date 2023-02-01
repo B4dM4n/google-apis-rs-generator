@@ -1246,7 +1246,7 @@ impl Type {
                     // treated as BTreeMap's and don't need a type definition.
                     None
                 } else {
-                    let mut has_next_page_token = false;
+                    let mut next_page_token_ty = None;
                     let mut fields: Vec<syn::Field> = props
                         .iter()
                         .map(
@@ -1261,11 +1261,11 @@ impl Type {
                                 },
                             )| {
                                 use syn::parse::Parser;
-                                if id == "nextPageToken" {
-                                   has_next_page_token = true;
-                                }
                                 let typ = ref_or_type.get_type(schemas);
                                 let mut type_path = syn::Type::Path(typ.type_path());
+                                if id == "nextPageToken" {
+                                   next_page_token_ty = Some(type_path.clone());
+                                }
                                 if typ.requires_pointer_indirection_when_within(self, schemas) {
                                     type_path = parse_quote! {Box<#type_path>};
                                 }
@@ -1314,10 +1314,10 @@ impl Type {
                         fields.push(field);
                     }
                     let mut get_next_page_token_impl = None;
-                    if has_next_page_token {
+                    if let Some(ty) = next_page_token_ty {
                         get_next_page_token_impl = Some(quote! {
-                            impl crate::GetNextPageToken for #name {
-                                fn next_page_token(&self) -> ::std::option::Option<String> {
+                            impl crate::GetNextPageToken<#ty> for #name {
+                                fn next_page_token(&self) -> ::std::option::Option<#ty> {
                                     self.next_page_token.to_owned()
                                 }
                             }

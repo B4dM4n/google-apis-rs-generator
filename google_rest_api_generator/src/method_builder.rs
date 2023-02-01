@@ -408,15 +408,26 @@ fn request_method<'a>(http_method: &str, params: impl Iterator<Item = &'a Param>
 
 fn streamable_method_impl(method: &Method) -> TokenStream {
     let builder_name = method.builder_name();
+    let next_page_ty: syn::Type = method
+        .params
+        .iter()
+        .find(|p| p.id == "pageToken")
+        .expect("method to have a pageToken param")
+        .typ
+        .type_path()
+        .into();
+
     quote! {
         #[async_trait::async_trait]
         impl<'a> crate::stream::StreamableMethod for #builder_name<'a> {
-            fn set_page_token(&mut self, value: String) {
+            type PageToken = #next_page_ty;
+
+            fn set_page_token(&mut self, value: #next_page_ty) {
                 self.page_token = value.into();
             }
             async fn execute<T>(&mut self) -> Result<T, crate::Error>
             where
-                T: crate::GetNextPageToken + ::serde::de::DeserializeOwned,
+                T: crate::GetNextPageToken<#next_page_ty> + ::serde::de::DeserializeOwned,
             {
                 self._execute().await
             }
@@ -433,6 +444,14 @@ fn stream_defs(
     if page_token_param == PageTokenParam::None {
         return (quote! {}, quote! {});
     }
+    let page_token_ty: syn::Type = method
+        .params
+        .iter()
+        .find(|p| p.id == "pageToken")
+        .expect("method to have a pageToken param")
+        .typ
+        .type_path()
+        .into();
     let response = method.response.as_ref().unwrap(); // unwrap safe because is_iterable returned true.
     let response_type_path = response.type_path();
     let response_type_desc: &TypeDesc = &response.get_type(schemas).type_desc;
@@ -548,12 +567,12 @@ Only the given `fields` are requested from the server.
                 #[derive(::serde::Deserialize, ::serde::Serialize)]
                 struct Page<T> {
                     #[serde(rename = "nextPageToken")]
-                    pub next_page_token: ::std::option::Option<String>,
+                    pub next_page_token: ::std::option::Option<#page_token_ty>,
                     #[serde(rename = #prop_id)]
                     pub items: Vec<T>,
                 }
-                impl<T> crate::GetNextPageToken for Page<T> {
-                    fn next_page_token(&self) -> ::std::option::Option<String> {
+                impl<T> crate::GetNextPageToken<#page_token_ty> for Page<T> {
+                    fn next_page_token(&self) -> ::std::option::Option<#page_token_ty> {
                         self.next_page_token.to_owned()
                     }
                 }
@@ -593,7 +612,7 @@ Only the given `fields` are requested from the server.
         /// [`FieldSelector`]: ::google_field_selector::FieldSelector
         pub fn stream<T>(self) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
         where
-            T: crate::GetNextPageToken
+            T: crate::GetNextPageToken<#page_token_ty>
                 + ::serde::de::DeserializeOwned
                 + ::google_field_selector::FieldSelector
                 + 'a,
@@ -642,7 +661,7 @@ Only the given `fields` are requested from the server.
             fields: ::std::option::Option<F>
         ) -> impl ::futures::Stream<Item = Result<T, crate::Error>> + 'a
         where
-            T: crate::GetNextPageToken + ::serde::de::DeserializeOwned + 'a,
+            T: crate::GetNextPageToken<#page_token_ty> + ::serde::de::DeserializeOwned + 'a,
             F: AsRef<str>,
         {
             let mut fields = fields.as_ref().map(|x| x.as_ref()).unwrap_or("").to_owned();
