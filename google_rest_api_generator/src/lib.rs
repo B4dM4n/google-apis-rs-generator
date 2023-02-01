@@ -281,6 +281,8 @@ impl APIDesc {
         });
         info!("outputting");
         quote! {
+            #![allow(rustdoc::bare_urls)]
+
             #![doc = #package_doc]
             pub mod scopes {
                 #(#scope_constants)*
