@@ -11,6 +11,6 @@ proc-macro = true
 
 [dependencies]
 serde_derive_internals = "0.26.0"
-syn = "1.0.3"
+syn = "1.0.107"
 quote = "1"
 proc-macro2 = "1"

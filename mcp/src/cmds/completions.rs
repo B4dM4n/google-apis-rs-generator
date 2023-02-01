@@ -1,7 +1,7 @@
 use crate::options::completions::Args;
-use clap::{App, Shell};
 use failure::{err_msg, format_err, Error, ResultExt};
 use std::{io::stdout, path::Path, str::FromStr};
+use structopt::clap::{App, Shell};
 
 pub fn execute(mut app: App, Args { shell }: Args) -> Result<(), Error> {
     let shell = Path::new(&shell)

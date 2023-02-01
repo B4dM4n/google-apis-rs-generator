@@ -14,7 +14,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     );
     println!(
         "cargo:rustc-env=BUILD_DATE={}",
-        Utc::today().format("%Y-%m-%d")
+        Utc::now().format("%Y-%m-%d")
     );
     Ok(())
 }
